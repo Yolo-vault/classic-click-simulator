@@ -1,0 +1,32 @@
+{
+  "name": "classic-click-simulator",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "$path": "Source/Shared",
+      "Packages": {
+        "$path": "Packages"
+      }
+    },
+    "ReplicatedFirst": {
+      "$ignoreUnknownInstances": true,
+      "$path": "Source/SharedFirst"
+    },
+    "ServerScriptService": {
+      "$ignoreUnknownInstances": true,
+      "$path": "Source/Server",
+      "Packages": {
+        "$path": "ServerPackages"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "$path": "Source/Client",
+        "UI": {
+          "$path": "Source/UI"
+        }
+      }
+    }
+  }
+}
