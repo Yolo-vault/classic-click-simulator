@@ -1,3 +1,6 @@
+# VSCode settings
+.vscode/
+
 # Project place file
 /classic-click-simulator.rbxlx
 
@@ -7,5 +10,6 @@
 
 /Packages/
 /ServerPackages/
+/Remotes/
 /sourcemap.json
 /*.lock

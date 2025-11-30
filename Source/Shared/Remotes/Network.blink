@@ -1,0 +1,23 @@
+option ClientOutput = "Client/BlinkClient.luau"
+option ServerOutput = "Server/BlinkServer.luau"
+
+event Click {
+    From: Client,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: (f64, f64) -- amount, timestamp
+}
+
+event UpdateClicks {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: f64 -- amount
+}
+
+function GetData {
+    Yield: Coroutine, -- ou Future/Promise
+    Data: string,     -- key
+    Return: f64
+}
+

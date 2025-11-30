@@ -8,7 +8,7 @@ local PlayerDataConfig = require(ServerScriptService.Configuration.PlayerDataCon
 local ProfileService = require(ServerScriptService.Packages.ProfileService)
 
 local KICK_MESSAGE = SystemConfig.KICK_MESSAGE
-local DATASTORE_NAME = RunService:IsStudio() and "Development" or "Production"
+local DATASTORE_NAME = RunService:IsStudio() and "Development_0.0.2" or "Production"
 
 local PlayerDataService = {}
 local ProfileStore = ProfileService.GetProfileStore(DATASTORE_NAME, PlayerDataConfig)
