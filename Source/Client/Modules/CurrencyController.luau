@@ -1,6 +1,10 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local FormatNumber = require(ReplicatedStorage.Packages.FormatNumber)
+local Blink = require(ReplicatedStorage.Remotes.Client.BlinkClient)
 local Player = Players.LocalPlayer
+
 local PlayerGui = Player:WaitForChild("PlayerGui")
 local Gui = PlayerGui:WaitForChild("InGame"):WaitForChild("HUD")
 local LeftPanel = Gui:WaitForChild("LEFT_PANEL")
@@ -10,11 +14,11 @@ local ClicksAmount = ClicksFrame:WaitForChild("Amount")
 local GemsFrame = CurrencyFrame:WaitForChild("GemsFrame")
 local GemsAmount = GemsFrame:WaitForChild("Amount")
 
-local Blink = require(ReplicatedStorage.Remotes.Client.BlinkClient)
-
 local CurrencyController = {}
 
 local function UpdateCurrencyDisplay(currency: "Clicks" | "Gems", amount: number)
+	amount = FormatNumber.Simple.FormatCompact(amount)
+
 	if currency == "Clicks" then
 		ClicksAmount.Text = tostring(amount)
 	elseif currency == "Gems" then
@@ -28,7 +32,7 @@ function CurrencyController.Start()
 			return Blink.GetData.Invoke("Clicks")
 		end)
 
-		if success and initialClicks then
+		if success and typeof(initialClicks) == "number" then
 			UpdateCurrencyDisplay("Clicks", initialClicks)
 		else
 			warn("Falha ao obter dados iniciais de clicks")

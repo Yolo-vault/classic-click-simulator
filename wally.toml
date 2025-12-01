@@ -6,8 +6,8 @@ realm = "shared"
 
 [dependencies]
 Net = "vorlias/net@3.0.1"
+FormatNumber = "kumarion/formatnumber@0.0.1"
 
 [server-dependencies]
 ProfileService = "grilme99/profileservice@1.0.0"
 Cmdr = "evaera/cmdr@1.12.0"
-FormatNumber = "kumarion/formatnumber@0.0.1"

@@ -22,11 +22,21 @@ function PlayerProfiles.AdjustClicks(player, amount)
 end
 
 Blink.GetData.On(function(player, key)
+	print("GetData request:", player.Name, key)
+
 	local profile = PlayerProfiles.Profiles[player]
 	if not profile then
-		return nil
+		return 0
 	end
-	return profile.Data[key]
+
+	print("Value in profile:", profile.Data[key])
+
+	local value = profile.Data[key]
+	if typeof(value) == "number" then
+		return value
+	end
+
+	return tonumber(value) or 0
 end)
 
 return PlayerProfiles

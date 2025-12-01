@@ -1,11 +1,13 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PlayerProfiles = require(ServerScriptService.Modules.PlayerData.PlayerProfiles)
 local SystemConfig = require(ServerScriptService.Configuration.SystemConfig)
 local PlayerDataConfig = require(ServerScriptService.Configuration.PlayerDataConfig)
 local ProfileService = require(ServerScriptService.Packages.ProfileService)
+local Blink = require(ReplicatedStorage.Remotes.Server.BlinkServer)
 
 local KICK_MESSAGE = SystemConfig.KICK_MESSAGE
 local DATASTORE_NAME = RunService:IsStudio() and "Development_0.0.2" or "Production"
@@ -46,8 +48,12 @@ function PlayerDataService.LoadProfile(player)
 	end)
 
 	if player.Parent == Players then
+		-- Armazena e cria leaderstats
 		PlayerProfiles.Profiles[player] = profile
 		CreateLeaderstats(player, profile)
+
+		-- envia dados iniciais ao cliente
+		Blink.UpdateClicks.Fire(player, profile.Data.Clicks)
 	else
 		profile:Release()
 	end

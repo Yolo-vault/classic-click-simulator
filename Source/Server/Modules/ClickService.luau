@@ -18,8 +18,9 @@ function ClickService.Start()
 			Cooldown[player] = nil
 		end)
 
-		local newTotal = PlayerProfiles.AdjustClicks(player, amount) or 0
-		warn("newTotal:", newTotal)
+		local newTotalRaw = PlayerProfiles.AdjustClicks(player, amount)
+		local newTotal = tonumber(newTotalRaw) or 0
+		warn("newTotal:", newTotal, "raw:", newTotalRaw, "type:", typeof(newTotalRaw))
 
 		Blink.UpdateClicks.Fire(player, newTotal)
 	end)
