@@ -160,6 +160,8 @@ local SerdesEvent = "?"
 local SerdesThread: thread?
 Queue.Reliable[0] = table.create(256)
 Queue.Reliable[2] = table.create(256)
+Queue.Reliable[4] = table.create(256)
+Queue.Reliable[5] = table.create(256)
 local function ReadEVENT_Click(): (number, number)
 	-- Read BLOCK: 16 bytes
 	local BLOCK_START = Read(16)
@@ -175,6 +177,20 @@ local function WriteEVENT_UpdateClicks(Value: number): ()
 	buffer.writef64(SendBuffer, BLOCK_START + 1, Value)
 end
 
+local function ReadEVENT_UpdateAutoClicker(): (number)
+	-- Read BLOCK: 8 bytes
+	local BLOCK_START = Read(8)
+	local Value = buffer.readf64(RecieveBuffer, BLOCK_START + 0)
+	return Value
+end
+
+local function WriteEVENT_AutoClickModeChanged(Value: number): ()
+	-- Allocate BLOCK: 9 bytes
+	local BLOCK_START = Allocate(9)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 3)
+	buffer.writef64(SendBuffer, BLOCK_START + 1, Value)
+end
+
 local function ReadFUNCTION_DATA_GetData(): (string)
 	-- Read BLOCK: 2 bytes
 	local BLOCK_START = Read(2)
@@ -186,10 +202,27 @@ end
 local function WriteFUNCTION_RETURN_GetData(Value: number, InvocationIdentifier: number): ()
 	-- Allocate BLOCK: 11 bytes
 	local BLOCK_START = Allocate(11)
-	buffer.writeu8(SendBuffer, BLOCK_START + 0, 2)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 4)
 	buffer.writeu8(SendBuffer, BLOCK_START + 1, InvocationIdentifier)
 	buffer.writeu8(SendBuffer, BLOCK_START + 2, 1)
 	buffer.writef64(SendBuffer, BLOCK_START + 3, Value)
+end
+
+local function ReadFUNCTION_DATA_GetAutoClickMode(): (string)
+	-- Read BLOCK: 2 bytes
+	local BLOCK_START = Read(2)
+	local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+	local Value = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	return Value
+end
+
+local function WriteFUNCTION_RETURN_GetAutoClickMode(Value: boolean, InvocationIdentifier: number): ()
+	-- Allocate BLOCK: 4 bytes
+	local BLOCK_START = Allocate(4)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 5)
+	buffer.writeu8(SendBuffer, BLOCK_START + 1, InvocationIdentifier)
+	buffer.writeu8(SendBuffer, BLOCK_START + 2, 1)
+	buffer.writeu8(SendBuffer, BLOCK_START + 3, Value and 1 or 0)
 end
 
 if not RunService:IsRunning() then
@@ -204,7 +237,19 @@ if not RunService:IsRunning() then
 		FireList = NOOP,
 		FireExcept = NOOP
 	},
+	UpdateAutoClicker = {
+		On = NOOP
+	},
+	AutoClickModeChanged = {
+		Fire = NOOP,
+		FireAll = NOOP,
+		FireList = NOOP,
+		FireExcept = NOOP
+	},
 	GetData = {
+		On = NOOP
+	},
+	GetAutoClickMode = {
 		On = NOOP
 	},
 	})
@@ -281,17 +326,41 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 				table.insert(Queue.Reliable[0], {Player, Value1, Value2} :: {any})
 			end
 		elseif Index == 2 then
+			local Value: number = ReadEVENT_UpdateAutoClicker()
+			if Events.Reliable[2] ~= nil then
+				SerdesEvent = "UpdateAutoClicker"
+				Events.Reliable[2](Player, Value)
+			else
+				if #Queue.Reliable[2] > 256 then
+					warn("[Blink]: Event queue of \"UpdateAutoClicker\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[2], {Player, Value} :: {any})
+			end
+		elseif Index == 4 then
 			-- Read BLOCK: 1 bytes
 			local BLOCK_START = Read(1)
 			local InvocationIdentifier = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
 			local Value: string = ReadFUNCTION_DATA_GetData()
-			if Events.Reliable[2] ~= nil then
-				task.spawn(Events.Reliable[2], Player, Value, InvocationIdentifier)
+			if Events.Reliable[4] ~= nil then
+				task.spawn(Events.Reliable[4], Player, Value, InvocationIdentifier)
 			else
-				if #Queue.Reliable[2] > 256 then
+				if #Queue.Reliable[4] > 256 then
 					warn("[Blink]: Event queue of \"GetData\" exceeded 256, did you forget to implement a listener?")
 				end
-				table.insert(Queue.Reliable[2], {Player, Value, InvocationIdentifier} :: {any})
+				table.insert(Queue.Reliable[4], {Player, Value, InvocationIdentifier} :: {any})
+			end
+		elseif Index == 5 then
+			-- Read BLOCK: 1 bytes
+			local BLOCK_START = Read(1)
+			local InvocationIdentifier = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+			local Value: string = ReadFUNCTION_DATA_GetAutoClickMode()
+			if Events.Reliable[5] ~= nil then
+				task.spawn(Events.Reliable[5], Player, Value, InvocationIdentifier)
+			else
+				if #Queue.Reliable[5] > 256 then
+					warn("[Blink]: Event queue of \"GetAutoClickMode\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[5], {Player, Value, InvocationIdentifier} :: {any})
 			end
 		end
 	end
@@ -378,9 +447,69 @@ local Returns = table.freeze({
 			end
 		end,
 	},
+	UpdateAutoClicker = {
+		On = function(Listener: (Player: Player, Value: number) -> ()): () -> ()
+			Events.Reliable[2] = Listener
+			for Index, Arguments in Queue.Reliable[2] do
+				Listener(table.unpack(Arguments))
+			end
+			Queue.Reliable[2] = {}
+			return function (): ()
+				if Events.Reliable[2] == Listener then
+					Events.Reliable[2] = nil
+				end
+			end
+		end
+	},
+	AutoClickModeChanged = {
+		Fire = function(Player: Player, Value: number): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_AutoClickModeChanged(Value)
+			PlayersMap[Player] = Save()
+		end,
+		FireAll = function(Value: number): ()
+			Load()
+			WriteEVENT_AutoClickModeChanged(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireList = function(List: {Player}, Value: number): ()
+			Load()
+			WriteEVENT_AutoClickModeChanged(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: number): ()
+			Load()
+			WriteEVENT_AutoClickModeChanged(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+	},
 	GetData = {
 		On = function(Listener: (Player, string) -> (number)): ()
-			Events.Reliable[2] = function(Player: Player, Value: string, InvocationIdentifier: number): ()
+			Events.Reliable[4] = function(Player: Player, Value: string, InvocationIdentifier: number): ()
 				local ReturnValue: number;
 				local Success, Error = pcall(function ()
 					ReturnValue = Listener(Player, Value)
@@ -388,7 +517,7 @@ local Returns = table.freeze({
 				Load(PlayersMap[Player])
 				if Success ~= true then
 					local Position = Allocate(3)
-					buffer.writeu8(SendBuffer, Position, 2)
+					buffer.writeu8(SendBuffer, Position, 4)
 					buffer.writeu8(SendBuffer, Position + 1, InvocationIdentifier)
 					buffer.writeu8(SendBuffer, Position + 2, 0)
 					warn(`"GetData" encountered an error, {Error}`)
@@ -398,10 +527,38 @@ local Returns = table.freeze({
 				PlayersMap[Player] = Save()
 			end
 			task.spawn(function (): ()
-				local EventQueue = Queue.Reliable[2] or {}
-				Queue.Reliable[2] = nil
+				local EventQueue = Queue.Reliable[4] or {}
+				Queue.Reliable[4] = nil
 				for Index, Arguments in EventQueue do
-					Events.Reliable[2](table.unpack(Arguments))
+					Events.Reliable[4](table.unpack(Arguments))
+				end
+			end)
+		end
+	},
+	GetAutoClickMode = {
+		On = function(Listener: (Player, string) -> (boolean)): ()
+			Events.Reliable[5] = function(Player: Player, Value: string, InvocationIdentifier: number): ()
+				local ReturnValue: boolean;
+				local Success, Error = pcall(function ()
+					ReturnValue = Listener(Player, Value)
+				end)
+				Load(PlayersMap[Player])
+				if Success ~= true then
+					local Position = Allocate(3)
+					buffer.writeu8(SendBuffer, Position, 5)
+					buffer.writeu8(SendBuffer, Position + 1, InvocationIdentifier)
+					buffer.writeu8(SendBuffer, Position + 2, 0)
+					warn(`"GetAutoClickMode" encountered an error, {Error}`)
+				else
+					WriteFUNCTION_RETURN_GetAutoClickMode(ReturnValue, InvocationIdentifier)
+				end
+				PlayersMap[Player] = Save()
+			end
+			task.spawn(function (): ()
+				local EventQueue = Queue.Reliable[5] or {}
+				Queue.Reliable[5] = nil
+				for Index, Arguments in EventQueue do
+					Events.Reliable[5](table.unpack(Arguments))
 				end
 			end)
 		end

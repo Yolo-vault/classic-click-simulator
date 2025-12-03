@@ -5,19 +5,38 @@ event Click {
     From: Client,
     Type: Reliable,
     Call: SingleSync,
-    Data: (f64, f64) -- amount, timestamp
+    Data: (f64, f64)
 }
 
 event UpdateClicks {
     From: Server,
     Type: Reliable,
     Call: SingleSync,
-    Data: f64 -- amount
+    Data: f64
+}
+
+event UpdateAutoClicker {
+    From: Client,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: f64
+}
+
+event AutoClickModeChanged {
+    From: Server,
+    Type: Reliable,
+    Call: ManySync,
+    Data: f64
 }
 
 function GetData {
-    Yield: Coroutine, -- ou Future/Promise
-    Data: string,     -- key
+    Yield: Coroutine,
+    Data: string,
     Return: f64
 }
 
+function GetAutoClickMode {
+    Yield: Coroutine,
+    Data: string,
+    Return: boolean
+}

@@ -8,9 +8,7 @@
 
 _G._BLINK = _G._BLINK or {}
 if _G._BLINK["BLINK"] then
-	error(
-		'[Blink]: An instance of blink is already running with the remote scope "BLINK". Change the remote scope of either instance to avoid conflicts.'
-	)
+	error("[Blink]: An instance of blink is already running with the remote scope \"BLINK\". Change the remote scope of either instance to avoid conflicts.")
 end
 _G._BLINK["BLINK"] = true
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,133 +32,136 @@ local RecieveInstanceCursor = 0
 local Null = newproxy()
 
 type Entry = {
-	value: any,
-	next: Entry?,
+    value: any,
+    next: Entry?
 }
 
 type Queue = {
-	head: Entry?,
-	tail: Entry?,
+    head: Entry?,
+    tail: Entry?
 }
 
 type BufferSave = {
-	Size: number,
-	Cursor: number,
-	Buffer: buffer,
-	Instances: { Instance },
+    Size: number, 
+    Cursor: number, 
+    Buffer: buffer, 
+    Instances: {Instance}
 }
 
 local function Read(Bytes: number)
-	local Offset = RecieveCursor
-	RecieveCursor += Bytes
-	return Offset
+    local Offset = RecieveCursor
+    RecieveCursor += Bytes
+    return Offset
 end
 
 local function Save(): BufferSave
-	return {
-		Size = SendSize,
-		Cursor = SendCursor,
-		Buffer = SendBuffer,
-		Instances = SendInstances,
-	}
+    return {
+        Size = SendSize,
+        Cursor = SendCursor,
+        Buffer = SendBuffer,
+        Instances = SendInstances
+    }
 end
 
 local function Load(Save: BufferSave?)
-	if Save then
-		SendSize = Save.Size
-		SendCursor = Save.Cursor
-		SendOffset = Save.Cursor
-		SendBuffer = Save.Buffer
-		SendInstances = Save.Instances
-		return
-	end
+    if Save then
+        SendSize = Save.Size
+        SendCursor = Save.Cursor
+        SendOffset = Save.Cursor
+        SendBuffer = Save.Buffer
+        SendInstances = Save.Instances
+        return
+    end
 
-	SendSize = 64
-	SendCursor = 0
-	SendOffset = 0
-	SendBuffer = buffer.create(64)
-	SendInstances = {}
+    SendSize = 64
+    SendCursor = 0
+    SendOffset = 0
+    SendBuffer = buffer.create(64)
+    SendInstances = {}
 end
 
 local function Invoke()
-	if Invocations == 255 then
-		Invocations = 0
-	end
+    if Invocations == 255 then
+        Invocations = 0
+    end
 
-	local Invocation = Invocations
-	Invocations += 1
-	return Invocation
+    local Invocation = Invocations
+    Invocations += 1
+    return Invocation
 end
 
 local function Allocate(Bytes: number)
-	local InUse = (SendCursor + Bytes)
-	if InUse > SendSize then
-		--> Avoid resizing the buffer for every write
-		while InUse > SendSize do
-			SendSize *= 1.5
-		end
+    local InUse = (SendCursor + Bytes)
+    if InUse > SendSize then
+        --> Avoid resizing the buffer for every write
+        while InUse > SendSize do
+            SendSize *= 1.5
+        end
 
-		local Buffer = buffer.create(SendSize)
-		buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
-		SendBuffer = Buffer
-	end
+        local Buffer = buffer.create(SendSize)
+        buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+        SendBuffer = Buffer
+    end
 
-	SendOffset = SendCursor
-	SendCursor += Bytes
-
-	return SendOffset
+    SendOffset = SendCursor
+    SendCursor += Bytes
+    
+    return SendOffset
 end
 
 local function CreateQueue(): Queue
-	return {
-		head = nil,
-		tail = nil,
-	}
+    return {
+        head = nil,
+        tail = nil
+    }
 end
 
 local function Pop(queue: Queue): any
-	local head = queue.head
-	if head == nil then
-		return
-	end
+    local head = queue.head
+    if head == nil then
+        return
+    end
 
-	queue.head = head.next
-	return head.value
+    queue.head = head.next
+    return head.value
 end
 
 local function Push(queue: Queue, value: any)
-	local entry: Entry = {
-		value = value,
-		next = nil,
-	}
+    local entry: Entry = {
+        value = value,
+        next = nil
+    }
 
-	if queue.tail ~= nil then
-		queue.tail.next = entry
-	end
+    if queue.tail ~= nil then
+        queue.tail.next = entry
+    end
 
-	queue.tail = entry
+    queue.tail = entry
 
-	if queue.head == nil then
-		queue.head = entry
-	end
+    if queue.head == nil then
+        queue.head = entry
+    end
 end
 
 local Calls = table.create(256)
 
 local Events: any = {
-	Reliable = table.create(256),
-	Unreliable = table.create(256),
+    Reliable = table.create(256),
+    Unreliable = table.create(256)
 }
 
 local Queue: any = {
-	Reliable = table.create(256),
-	Unreliable = table.create(256),
+    Reliable = table.create(256),
+    Unreliable = table.create(256)
 }
 
 local SerdesEvent = "?"
 local SerdesThread: thread?
 Queue.Reliable[1] = table.create(256)
-Queue.Reliable[2] = table.create(256)
+Events.Reliable[3] = {}
+Queue.Reliable[3] = table.create(256)
+Queue.Reliable[4] = table.create(256)
+Queue.Reliable[5] = table.create(256)
 local function WriteEVENT_Click(Value1: number, Value2: number): ()
 	-- Allocate BLOCK: 17 bytes
 	local BLOCK_START = Allocate(17)
@@ -169,7 +170,21 @@ local function WriteEVENT_Click(Value1: number, Value2: number): ()
 	buffer.writef64(SendBuffer, BLOCK_START + 9, Value2)
 end
 
-local function ReadEVENT_UpdateClicks(): number
+local function ReadEVENT_UpdateClicks(): (number)
+	-- Read BLOCK: 8 bytes
+	local BLOCK_START = Read(8)
+	local Value = buffer.readf64(RecieveBuffer, BLOCK_START + 0)
+	return Value
+end
+
+local function WriteEVENT_UpdateAutoClicker(Value: number): ()
+	-- Allocate BLOCK: 9 bytes
+	local BLOCK_START = Allocate(9)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 2)
+	buffer.writef64(SendBuffer, BLOCK_START + 1, Value)
+end
+
+local function ReadEVENT_AutoClickModeChanged(): (number)
 	-- Read BLOCK: 8 bytes
 	local BLOCK_START = Read(8)
 	local Value = buffer.readf64(RecieveBuffer, BLOCK_START + 0)
@@ -179,7 +194,7 @@ end
 local function WriteFUNCTION_DATA_GetData(Value: string, InvocationIdentifier: number): ()
 	-- Allocate BLOCK: 4 bytes
 	local BLOCK_START = Allocate(4)
-	buffer.writeu8(SendBuffer, BLOCK_START + 0, 2)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 4)
 	buffer.writeu8(SendBuffer, BLOCK_START + 1, InvocationIdentifier)
 	local Length = #Value
 	buffer.writeu16(SendBuffer, BLOCK_START + 2, Length)
@@ -187,7 +202,7 @@ local function WriteFUNCTION_DATA_GetData(Value: string, InvocationIdentifier: n
 	buffer.writestring(SendBuffer, SendOffset, Value, Length)
 end
 
-local function ReadFUNCTION_RETURN_GetData(): number
+local function ReadFUNCTION_RETURN_GetData(): (number)
 	-- Read BLOCK: 9 bytes
 	local BLOCK_START = Read(9)
 	local Success = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
@@ -198,60 +213,88 @@ local function ReadFUNCTION_RETURN_GetData(): number
 	return Value
 end
 
+local function WriteFUNCTION_DATA_GetAutoClickMode(Value: string, InvocationIdentifier: number): ()
+	-- Allocate BLOCK: 4 bytes
+	local BLOCK_START = Allocate(4)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 5)
+	buffer.writeu8(SendBuffer, BLOCK_START + 1, InvocationIdentifier)
+	local Length = #Value
+	buffer.writeu16(SendBuffer, BLOCK_START + 2, Length)
+	Allocate(Length)
+	buffer.writestring(SendBuffer, SendOffset, Value, Length)
+end
+
+local function ReadFUNCTION_RETURN_GetAutoClickMode(): (boolean)
+	-- Read BLOCK: 2 bytes
+	local BLOCK_START = Read(2)
+	local Success = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+	if Success ~= 1 then
+		error("Server encountered an error.")
+	end
+	local Value = (buffer.readu8(RecieveBuffer, BLOCK_START + 1) == 1)
+	return Value
+end
+
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
-		Click = {
-			Fire = NOOP,
-		},
-		UpdateClicks = {
-			On = NOOP,
-		},
-		GetData = {
-			Invoke = NOOP,
-		},
+	Click = {
+		Fire = NOOP
+	},
+	UpdateClicks = {
+		On = NOOP
+	},
+	UpdateAutoClicker = {
+		Fire = NOOP
+	},
+	AutoClickModeChanged = {
+		On = NOOP
+	},
+	GetData = {
+		Invoke = NOOP
+	},
+	GetAutoClickMode = {
+		Invoke = NOOP
+	},
 	})
 	return Returns :: BLINK_EVENTS_SYMBOL
 end
 
 if not RunService:IsClient() then
-	error("Client network module can only be required from the client.")
+    error("Client network module can only be required from the client.")
 end
 
 local Reliable: RemoteEvent = ReplicatedStorage:WaitForChild(BASE_EVENT_NAME .. "_RELIABLE_REMOTE") :: RemoteEvent
-local Unreliable: UnreliableRemoteEvent =
-	ReplicatedStorage:WaitForChild(BASE_EVENT_NAME .. "_UNRELIABLE_REMOTE") :: UnreliableRemoteEvent
+local Unreliable: UnreliableRemoteEvent = ReplicatedStorage:WaitForChild(BASE_EVENT_NAME .. "_UNRELIABLE_REMOTE") :: UnreliableRemoteEvent
 
 local function StepReplication()
-	if SendCursor <= 0 then
-		return
-	end
+    if SendCursor <= 0 then
+        return
+    end
 
-	local Buffer = buffer.create(SendCursor)
-	buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
-	Reliable:FireServer(Buffer, SendInstances)
+    local Buffer = buffer.create(SendCursor)
+    buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+    Reliable:FireServer(Buffer, SendInstances)
 
-	SendSize = 64
-	SendCursor = 0
-	SendOffset = 0
-	SendBuffer = buffer.create(64)
-	table.clear(SendInstances)
+    SendSize = 64
+    SendCursor = 0
+    SendOffset = 0
+    SendBuffer = buffer.create(64)
+    table.clear(SendInstances)
 end
 RunService.Heartbeat:Connect(StepReplication)
-Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: { Instance })
+Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 	RecieveCursor = 0
 	RecieveBuffer = Buffer
 	RecieveInstances = Instances
 	RecieveInstanceCursor = 0
 	local Size = buffer.len(RecieveBuffer)
 	if SerdesThread and coroutine.status(SerdesThread) == "suspended" then
-		warn(
-			`[Blink]: Yielded in a Sync call. Event "{SerdesEvent}" uses a Sync call, consider using an Async call instead.`
-		)
+		warn(`[Blink]: Yielded in a Sync call. Event "{SerdesEvent}" uses a Sync call, consider using an Async call instead.`)
 		coroutine.close(SerdesThread)
 	end
 	SerdesThread = coroutine.running()
-	while RecieveCursor < Size do
+	while (RecieveCursor < Size) do
 		-- Read BLOCK: 1 bytes
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
@@ -262,17 +305,41 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: { Instance })
 				Events.Reliable[1](Value)
 			else
 				if #Queue.Reliable[1] > 256 then
-					warn('[Blink]: Event queue of "UpdateClicks" exceeded 256, did you forget to implement a listener?')
+					warn("[Blink]: Event queue of \"UpdateClicks\" exceeded 256, did you forget to implement a listener?")
 				end
-				table.insert(Queue.Reliable[1], { Value } :: { any })
+				table.insert(Queue.Reliable[1], {Value} :: {any})
 			end
-		elseif Index == 2 then
+		elseif Index == 3 then
+			local Value: number = ReadEVENT_AutoClickModeChanged()
+			if #Events.Reliable[3] > 0 then
+				for _, Listener in Events.Reliable[3] do
+					SerdesEvent = "AutoClickModeChanged"
+					Listener(Value)
+				end
+			else
+				if #Queue.Reliable[3] > 256 then
+					warn("[Blink]: Event queue of \"AutoClickModeChanged\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[3], {Value} :: {any})
+			end
+		elseif Index == 4 then
 			-- Read BLOCK: 1 bytes
 			local BLOCK_START = Read(1)
 			local InvocationIdentifier = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
-			local Success, ReturnValue = pcall(function()
-				return ReadFUNCTION_RETURN_GetData()
-			end)
+				local Success, ReturnValue = pcall(function ()
+					return ReadFUNCTION_RETURN_GetData()
+				end)
+			if Calls[InvocationIdentifier] ~= nil then
+				task.spawn(Calls[InvocationIdentifier], Success, ReturnValue)
+				Calls[InvocationIdentifier] = nil
+			end
+		elseif Index == 5 then
+			-- Read BLOCK: 1 bytes
+			local BLOCK_START = Read(1)
+			local InvocationIdentifier = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+				local Success, ReturnValue = pcall(function ()
+					return ReadFUNCTION_RETURN_GetAutoClickMode()
+				end)
 			if Calls[InvocationIdentifier] ~= nil then
 				task.spawn(Calls[InvocationIdentifier], Success, ReturnValue)
 				Calls[InvocationIdentifier] = nil
@@ -280,25 +347,24 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: { Instance })
 		end
 	end
 end)
-Unreliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: { Instance })
+Unreliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 	RecieveCursor = 0
 	RecieveBuffer = Buffer
 	RecieveInstances = Instances
 	RecieveInstanceCursor = 0
 	local Size = buffer.len(RecieveBuffer)
 	if SerdesThread and coroutine.status(SerdesThread) == "suspended" then
-		warn(
-			`[Blink]: Yielded in a Sync call. Event "{SerdesEvent}" uses a Sync call, consider using an Async call instead.`
-		)
+		warn(`[Blink]: Yielded in a Sync call. Event "{SerdesEvent}" uses a Sync call, consider using an Async call instead.`)
 		coroutine.close(SerdesThread)
 	end
 	SerdesThread = coroutine.running()
-	while RecieveCursor < Size do
+	while (RecieveCursor < Size) do
 		-- Read BLOCK: 1 bytes
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
 	end
 end)
+
 
 local Returns = table.freeze({
 	StepReplication = StepReplication,
@@ -306,7 +372,7 @@ local Returns = table.freeze({
 	Click = {
 		Fire = function(Value1: number, Value2: number): ()
 			WriteEVENT_Click(Value1, Value2)
-		end,
+		end
 	},
 	UpdateClicks = {
 		On = function(Listener: (Value: number) -> ()): () -> ()
@@ -315,15 +381,35 @@ local Returns = table.freeze({
 				Listener(table.unpack(Arguments))
 			end
 			Queue.Reliable[1] = {}
-			return function(): ()
+			return function (): ()
 				if Events.Reliable[1] == Listener then
 					Events.Reliable[1] = nil
 				end
 			end
-		end,
+		end
+	},
+	UpdateAutoClicker = {
+		Fire = function(Value: number): ()
+			WriteEVENT_UpdateAutoClicker(Value)
+		end
+	},
+	AutoClickModeChanged = {
+		On = function(Listener: (Value: number) -> ()): () -> ()
+			table.insert(Events.Reliable[3], Listener)
+			for Index, Arguments in Queue.Reliable[3] do
+				Listener(table.unpack(Arguments))
+			end
+			Queue.Reliable[3] = {}
+			return function (): ()
+				local Index = table.find(Events.Reliable[3], Listener)
+				if Index ~= nil then
+					table.remove(Events.Reliable[3], Index)
+				end
+			end
+		end
 	},
 	GetData = {
-		Invoke = function(Value: string): number
+		Invoke = function(Value: string): (number)
 			local InvocationIdentifier = Invoke()
 			if Calls[InvocationIdentifier] ~= nil then
 				Invocations -= 1
@@ -333,10 +419,26 @@ local Returns = table.freeze({
 			Calls[InvocationIdentifier] = coroutine.running()
 			local Success, ReturnValue: number = coroutine.yield()
 			if Success ~= true then
-				error('There was an exception while processing "GetData".')
+				error("There was an exception while processing \"GetData\".")
 			end
 			return ReturnValue
-		end,
+		end
+	},
+	GetAutoClickMode = {
+		Invoke = function(Value: string): (boolean)
+			local InvocationIdentifier = Invoke()
+			if Calls[InvocationIdentifier] ~= nil then
+				Invocations -= 1
+				error("More than 256 calls are awaiting a response, this packet has been dropped.")
+			end
+			WriteFUNCTION_DATA_GetAutoClickMode(Value, InvocationIdentifier)
+			Calls[InvocationIdentifier] = coroutine.running()
+			local Success, ReturnValue: boolean = coroutine.yield()
+			if Success ~= true then
+				error("There was an exception while processing \"GetAutoClickMode\".")
+			end
+			return ReturnValue
+		end
 	},
 })
 type BLINK_EVENTS_SYMBOL = typeof(Returns)

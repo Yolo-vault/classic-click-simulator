@@ -10,7 +10,7 @@ local ProfileService = require(ServerScriptService.Packages.ProfileService)
 local Blink = require(ReplicatedStorage.Remotes.Server.BlinkServer)
 
 local KICK_MESSAGE = SystemConfig.KICK_MESSAGE
-local DATASTORE_NAME = RunService:IsStudio() and "Development_0.0.2" or "Production"
+local DATASTORE_NAME = RunService:IsStudio() and "Development_0.0.6" or "Production"
 
 local PlayerDataService = {}
 local ProfileStore = ProfileService.GetProfileStore(DATASTORE_NAME, PlayerDataConfig)
