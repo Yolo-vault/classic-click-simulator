@@ -7,6 +7,7 @@ realm = "shared"
 [dependencies]
 Net = "vorlias/net@3.0.1"
 FormatNumber = "kumarion/formatnumber@0.0.1"
+Iris = "sirmallard/iris@2.5.0"
 
 [server-dependencies]
 ProfileService = "grilme99/profileservice@1.0.0"

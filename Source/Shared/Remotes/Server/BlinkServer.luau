@@ -162,6 +162,8 @@ Queue.Reliable[0] = table.create(256)
 Queue.Reliable[2] = table.create(256)
 Queue.Reliable[4] = table.create(256)
 Queue.Reliable[5] = table.create(256)
+Queue.Reliable[6] = table.create(256)
+Queue.Reliable[7] = table.create(256)
 local function ReadEVENT_Click(): (number, number)
 	-- Read BLOCK: 16 bytes
 	local BLOCK_START = Read(16)
@@ -225,6 +227,26 @@ local function WriteFUNCTION_RETURN_GetAutoClickMode(Value: boolean, InvocationI
 	buffer.writeu8(SendBuffer, BLOCK_START + 3, Value and 1 or 0)
 end
 
+local function ReadFUNCTION_DATA_DebugIsAdmin(): (nil)
+	return nil
+end
+
+local function WriteFUNCTION_RETURN_DebugIsAdmin(Value: boolean, InvocationIdentifier: number): ()
+	-- Allocate BLOCK: 4 bytes
+	local BLOCK_START = Allocate(4)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 6)
+	buffer.writeu8(SendBuffer, BLOCK_START + 1, InvocationIdentifier)
+	buffer.writeu8(SendBuffer, BLOCK_START + 2, 1)
+	buffer.writeu8(SendBuffer, BLOCK_START + 3, Value and 1 or 0)
+end
+
+local function ReadEVENT_DebugAddClicks(): (number)
+	-- Read BLOCK: 8 bytes
+	local BLOCK_START = Read(8)
+	local Value = buffer.readf64(RecieveBuffer, BLOCK_START + 0)
+	return Value
+end
+
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
@@ -250,6 +272,12 @@ if not RunService:IsRunning() then
 		On = NOOP
 	},
 	GetAutoClickMode = {
+		On = NOOP
+	},
+	DebugIsAdmin = {
+		On = NOOP
+	},
+	DebugAddClicks = {
 		On = NOOP
 	},
 	})
@@ -361,6 +389,30 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 					warn("[Blink]: Event queue of \"GetAutoClickMode\" exceeded 256, did you forget to implement a listener?")
 				end
 				table.insert(Queue.Reliable[5], {Player, Value, InvocationIdentifier} :: {any})
+			end
+		elseif Index == 6 then
+			-- Read BLOCK: 1 bytes
+			local BLOCK_START = Read(1)
+			local InvocationIdentifier = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+			local Value: nil = ReadFUNCTION_DATA_DebugIsAdmin()
+			if Events.Reliable[6] ~= nil then
+				task.spawn(Events.Reliable[6], Player, Value, InvocationIdentifier)
+			else
+				if #Queue.Reliable[6] > 256 then
+					warn("[Blink]: Event queue of \"DebugIsAdmin\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[6], {Player, Value, InvocationIdentifier} :: {any})
+			end
+		elseif Index == 7 then
+			local Value: number = ReadEVENT_DebugAddClicks()
+			if Events.Reliable[7] ~= nil then
+				SerdesEvent = "DebugAddClicks"
+				Events.Reliable[7](Player, Value)
+			else
+				if #Queue.Reliable[7] > 256 then
+					warn("[Blink]: Event queue of \"DebugAddClicks\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[7], {Player, Value} :: {any})
 			end
 		end
 	end
@@ -561,6 +613,48 @@ local Returns = table.freeze({
 					Events.Reliable[5](table.unpack(Arguments))
 				end
 			end)
+		end
+	},
+	DebugIsAdmin = {
+		On = function(Listener: (Player, nil) -> (boolean)): ()
+			Events.Reliable[6] = function(Player: Player, Value: nil, InvocationIdentifier: number): ()
+				local ReturnValue: boolean;
+				local Success, Error = pcall(function ()
+					ReturnValue = Listener(Player, Value)
+				end)
+				Load(PlayersMap[Player])
+				if Success ~= true then
+					local Position = Allocate(3)
+					buffer.writeu8(SendBuffer, Position, 6)
+					buffer.writeu8(SendBuffer, Position + 1, InvocationIdentifier)
+					buffer.writeu8(SendBuffer, Position + 2, 0)
+					warn(`"DebugIsAdmin" encountered an error, {Error}`)
+				else
+					WriteFUNCTION_RETURN_DebugIsAdmin(ReturnValue, InvocationIdentifier)
+				end
+				PlayersMap[Player] = Save()
+			end
+			task.spawn(function (): ()
+				local EventQueue = Queue.Reliable[6] or {}
+				Queue.Reliable[6] = nil
+				for Index, Arguments in EventQueue do
+					Events.Reliable[6](table.unpack(Arguments))
+				end
+			end)
+		end
+	},
+	DebugAddClicks = {
+		On = function(Listener: (Player: Player, Value: number) -> ()): () -> ()
+			Events.Reliable[7] = Listener
+			for Index, Arguments in Queue.Reliable[7] do
+				Listener(table.unpack(Arguments))
+			end
+			Queue.Reliable[7] = {}
+			return function (): ()
+				if Events.Reliable[7] == Listener then
+					Events.Reliable[7] = nil
+				end
+			end
 		end
 	},
 })

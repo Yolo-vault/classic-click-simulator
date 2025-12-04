@@ -40,3 +40,15 @@ function GetAutoClickMode {
     Data: string,
     Return: boolean
 }
+
+function DebugIsAdmin {
+    Yield: Coroutine,
+    Return: boolean
+}
+
+event DebugAddClicks {
+    From: Client,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: f64
+}
